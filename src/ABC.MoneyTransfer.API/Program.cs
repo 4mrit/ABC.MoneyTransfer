@@ -7,9 +7,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ABC.MoneyTransfer.Infrastructure.Data;
-using ABC.MoneyTransfer.Infrastructure.Services;
 using ABC.MoneyTransfer.Core.Interfaces;
 using ABC.MoneyTransfer.Core.Entities;
+using ABC.MoneyTransfer.Application.Services;
+using ABC.MoneyTransfer.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,18 +19,35 @@ builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
 // Configure Database Connection
-builder.AddSqlServerDbContext<AppDbContext>("IdentityDB");
+var connectionString = builder.Configuration.GetConnectionString("sqldb");
+builder.Services.AddDbContextPool<AppDbContext>(
+    dbContextOptionsBuilder => dbContextOptionsBuilder.UseSqlServer(
+        connectionString, o => o.MigrationsAssembly("ABC.MoneyTransfer.API")));
+builder.EnrichSqlServerDbContext<AppDbContext>();
+builder.AddServiceDefaults();
 
 // Identity Setup
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+builder.Services
+    .AddIdentity<ApplicationUser, ApplicationRole>(options =>
+    {
+        options.Password = new PasswordOptions
+        {
+            RequireDigit = true,
+            RequiredLength = 8,
+            RequireLowercase = true,
+            RequireUppercase = true,
+            RequireNonAlphanumeric = true
+        };
+    })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
 // Cookie Authentication
-builder.Services.ConfigureApplicationCookie(options => {
-  options.LoginPath = "/auth/login";
-  options.AccessDeniedPath = "/auth/access-denied";
-  options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Auth/login";
+    options.AccessDeniedPath = "/Auth/AccessDenied";
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
 });
 
 builder.Services
@@ -37,16 +55,21 @@ builder.Services
     .AddCookie();
 
 // Register Services
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
+
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
-builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+// builder.Services.AddScoped<ITransactionService, TransactionService>();
+// builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment()) {
-  app.UseDeveloperExceptionPage();
-  app.UseSwagger();
-  app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    await app.ConfigureDatabaseAsync();
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
