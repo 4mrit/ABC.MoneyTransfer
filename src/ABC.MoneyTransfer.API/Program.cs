@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure Services
 builder.Services.AddControllers();
+builder.Services.AddSwaggerGen();
 
 // Configure Database Connection
 builder.AddSqlServerDbContext<AppDbContext>("IdentityDB");
@@ -25,11 +26,10 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddDefaultTokenProviders();
 
 // Cookie Authentication
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/auth/login";
-    options.AccessDeniedPath = "/auth/access-denied";
-    options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+builder.Services.ConfigureApplicationCookie(options => {
+  options.LoginPath = "/auth/login";
+  options.AccessDeniedPath = "/auth/access-denied";
+  options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
 });
 
 builder.Services
@@ -43,9 +43,10 @@ builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
+if (app.Environment.IsDevelopment()) {
+  app.UseDeveloperExceptionPage();
+  app.UseSwagger();
+  app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
